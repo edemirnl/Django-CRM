@@ -6,11 +6,11 @@ djangorestframework==3.14.0
 djangorestframework-simplejwt==5.2.2
 drf-spectacular==0.26.2
 django-ses==3.5.0
-psycopg2-binary==2.9.6
+psycopg2-binary #==2.9.6
 whitenoise==6.4.0
 sentry-sdk==1.24.0
 wagtail==5.0.1
-django_extensions==3.2.1
+django_extensions #==3.2.1
 django_storages==1.13.2
 
 drf-rw-serializers==1.0.5
@@ -20,3 +20,7 @@ Redis==4.6.0
 django-phonenumber-field==7.1.0
 arrow==1.2.3
 phonenumbers==8.13.13
+
+setuptools
+psycopg2
+drf-yasg
