@@ -1,7 +1,8 @@
 import json
 import secrets
 from multiprocessing import context
-from re import template
+#from re import template
+import re
 
 import requests
 from django.contrib.auth.base_user import BaseUserManager
