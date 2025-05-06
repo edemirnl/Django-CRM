@@ -25,3 +25,5 @@ server.log
 .vscode
 staticfiles
 .venv
+myvenv/
+.python-version
