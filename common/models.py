@@ -35,7 +35,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(
         default=uuid.uuid4, unique=True, editable=False, db_index=True, primary_key=True
     )
-    email = models.EmailField(_("email address"), blank=True, unique=True)
+    username = models.CharField(max_length=20, blank=False, unique=True, null=False)
+    email = models.EmailField(_("email address"), blank=False, unique=True, null=False)
     profile_pic = models.CharField(
         max_length=1000, null=True, blank=True
     )

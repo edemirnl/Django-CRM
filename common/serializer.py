@@ -136,6 +136,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
+            "username",
             "email",
             "profile_pic",
         )
@@ -144,17 +145,19 @@ class CreateUserSerializer(serializers.ModelSerializer):
         self.org = kwargs.pop("org", None)
         super().__init__(*args, **kwargs)
         self.fields["email"].required = True
+        self.fields["username"].required = True
 
-    def validate_email(self, email):
-        if self.instance:
-            if self.instance.email != email:
-                if not Profile.objects.filter(user__email=email, org=self.org).exists():
-                    return email
-                raise serializers.ValidationError("Email already exists")
-            return email
-        if not Profile.objects.filter(user__email=email.lower(), org=self.org).exists():
-            return email
-        raise serializers.ValidationError("Given Email id already exists")
+    # def validate_email(self, email):
+    #     if self.instance:
+    #         if self.instance.email != email:
+    #             if not Profile.objects.filter(user__email=email, org=self.org).exists():
+    #                 return email
+    #             raise serializers.ValidationError("Email already exists")
+    #         return email
+    #     if not Profile.objects.filter(user__email=email.lower(), org=self.org).exists():
+    #         return email
+    #     raise serializers.ValidationError("Given Email id already exists")
+    
 
 
 class CreateProfileSerializer(serializers.ModelSerializer):
@@ -359,6 +362,7 @@ class UserCreateSwaggerSerializer(serializers.Serializer):
     """
     ROLE_CHOICES = ["ADMIN", "USER"]
 
+    username = serializers.CharField(max_length=1000,required=True)
     email = serializers.CharField(max_length=1000,required=True)
     role = serializers.ChoiceField(choices = ROLE_CHOICES,required=True)
     phone = serializers.CharField(max_length=12)
