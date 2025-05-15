@@ -586,3 +586,10 @@ class APISettings(BaseModel):
         if not self.apikey or self.apikey is None or self.apikey == "":
             self.apikey = generate_key()
         super().save(*args, **kwargs)
+
+
+class GoogleAuthConfig(models.Model):
+    google_enabled = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Google login enabled: {self.google_enabled}"

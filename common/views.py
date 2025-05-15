@@ -67,6 +67,9 @@ from teams.serializer import TeamsSerializer
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
+from common.models import GoogleAuthConfig
+
 
 
 class GetTeamsAndUsersView(APIView):
@@ -915,8 +918,20 @@ class GoogleLoginView(APIView):
         return Response(response)
 
 
-class AuthConfigView(APIView):
+class GoogleAuthConfigView(APIView):
     def get(self, request):
-        return Response({
-            "google_enabled": settings.ENABLE_GOOGLE_AUTH
-        })
+        config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
+        return Response({"google_enabled": config.google_enabled})
+
+    @extend_schema(
+        request=GoogleAuthConfigSerializer,
+        responses={200: GoogleAuthConfigSerializer}
+    )
+    def put(self, request):
+        config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
+        new_value = request.data.get("google_enabled")
+        if isinstance(new_value, bool):
+            config.google_enabled = new_value
+            config.save()
+            return Response({"google_enabled": config.google_enabled}, status=200)
+        return Response({"error": "Invalid value"}, status=400)
