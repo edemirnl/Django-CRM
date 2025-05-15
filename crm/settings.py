@@ -122,17 +122,6 @@ WSGI_APPLICATION = "crm.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/1.10/ref/settings/#databases
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": os.environ["bottlecrm"],
-#         "USER": os.environ["postgres"],
-#         "PASSWORD": os.environ["123"],
-#         "HOST": os.environ["localhost"],
-#         "PORT": os.environ[""],
-#     }
-# }
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
