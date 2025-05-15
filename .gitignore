@@ -16,7 +16,6 @@ ref.css.map
 .coverage
 crm/dev_settings\.py
 env
-.env
 docs/build
 celerybeat-schedule
 local_settings.py
@@ -26,3 +25,5 @@ server.log
 .vscode
 staticfiles
 .venv
+myvenv/
+.python-version

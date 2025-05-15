@@ -154,3 +154,29 @@ For commercial support [Contact us](https://micropyramid.com/contact-us/)
 
 # Trigger deploy
 
+
+__________________________________________________
+
+# Step for running the project
+- create a virtual environment from terminal:	
+py -m venv myvenv
+myvenv\Scripts\activate
+
+- install the requirments.txt file
+pip install -r requirements.txt  
+
+- install postgre on laptop from https://www.enterprisedb.com/downloads/postgres-postgresql-downloads
+The user in the database will be "postgres" as default, keep it. And make the password as "root" as is written in the .env file, also the port as 5432
+
+- install docker on laptop then run the folowing two commands
+docker build -t djcrm:1 -f docker/Dockerfile .
+docker-compose -f docker/docker-compose.yml up 
+
+- open postgresql shell from pgAdmin -> CREATE DATABASE bottlecrm;
+
+- run the following two commands
+python manage.py migrate
+python manage.py runserver
+
+- from the browser
+http://localhost:8000/swagger-ui/
