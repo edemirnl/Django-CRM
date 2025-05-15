@@ -63,6 +63,9 @@ from opportunity.models import Opportunity
 from opportunity.serializer import OpportunitySerializer
 from teams.models import Teams
 from teams.serializer import TeamsSerializer
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
 
 
 class GetTeamsAndUsersView(APIView):
@@ -909,3 +912,10 @@ class GoogleLoginView(APIView):
         response['refresh_token'] = str(token)
         response['user_id'] = user.id
         return Response(response)
+
+
+class AuthConfigView(APIView):
+    def get(self, request):
+        return Response({
+            "google_enabled": settings.ENABLE_GOOGLE_AUTH
+        })
