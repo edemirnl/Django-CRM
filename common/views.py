@@ -115,11 +115,6 @@ class AdminSignupView(APIView):
                 admin.set_password(params.get("password"))
                 admin.save()
                
-                profile = Profile.objects.create(
-                        user=admin,
-                        date_of_joining=timezone.now(),
-                        role="ADMIN"
-                    )
                 return Response(
                     {"error": False, "message": "User Created Successfully"},
                     status=status.HTTP_201_CREATED,
