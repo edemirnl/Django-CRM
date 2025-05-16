@@ -119,6 +119,8 @@ class UsersListView(APIView, LimitOffsetPagination):
                         is_active=True,
                     )
                     user.email = user.email
+                    user.username = user.username
+                    user.set_password(params.get("password"))
                     user.save()
                     # if params.get("password"):
                     #     user.set_password(params.get("password"))
@@ -898,6 +900,7 @@ class GoogleLoginView(APIView):
         except User.DoesNotExist:
             user = User()
             user.email = data['email']
+            user.username = f"user_{user.id.hex[:8]}"
             user.profile_pic = data['picture']
             # provider random default password
             user.password = make_password(BaseUserManager().make_random_password())

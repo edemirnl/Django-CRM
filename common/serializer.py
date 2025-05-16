@@ -136,7 +136,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = (
+            "username",
             "email",
+            "password",
             "profile_pic",
         )
 
@@ -144,18 +146,37 @@ class CreateUserSerializer(serializers.ModelSerializer):
         self.org = kwargs.pop("org", None)
         super().__init__(*args, **kwargs)
         self.fields["email"].required = True
+        self.fields["username"].required = True
+        self.fields["password"].required = True
 
-    def validate_email(self, email):
-        if self.instance:
-            if self.instance.email != email:
-                if not Profile.objects.filter(user__email=email, org=self.org).exists():
-                    return email
-                raise serializers.ValidationError("Email already exists")
-            return email
-        if not Profile.objects.filter(user__email=email.lower(), org=self.org).exists():
-            return email
-        raise serializers.ValidationError("Given Email id already exists")
+    # def validate_email(self, email):
+    #     if self.instance:
+    #         if self.instance.email != email:
+    #             if not Profile.objects.filter(user__email=email, org=self.org).exists():
+    #                 return email
+    #             raise serializers.ValidationError("Email already exists")
+    #         return email
+    #     if not Profile.objects.filter(user__email=email.lower(), org=self.org).exists():
+    #         return email
+    #     raise serializers.ValidationError("Given Email id already exists")
+    
+    def validate_password(self, password):
+        errors = []
 
+        if len(password) < 8:
+            errors.append("Password must be at least 8 characters long.")
+        if not re.search(r"[a-z]", password):
+            errors.append("Password must contain at least one lowercase letter.")
+        if not re.search(r"[A-Z]", password):
+            errors.append("Password must contain at least one uppercase letter.")
+        if not re.search(r"\d", password):
+            errors.append("Password must contain at least one digit.")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+            errors.append("Password must contain at least one special character.")
+
+        if not errors:
+            return True
+        raise serializers.ValidationError(", ".join(str(item) for item in errors))
 
 class CreateProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -359,7 +380,9 @@ class UserCreateSwaggerSerializer(serializers.Serializer):
     """
     ROLE_CHOICES = ["ADMIN", "USER"]
 
+    username = serializers.CharField(max_length=1000,required=True)
     email = serializers.CharField(max_length=1000,required=True)
+    password = serializers.CharField(max_length=1000)
     role = serializers.ChoiceField(choices = ROLE_CHOICES,required=True)
     phone = serializers.CharField(max_length=12)
     alternate_phone = serializers.CharField(max_length=12)
