@@ -400,3 +400,5 @@ class UserUpdateStatusSwaggerSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices = STATUS_CHOICES,required=True)
 
 
+class GoogleAuthConfigSerializer(serializers.Serializer):
+    google_enabled = serializers.BooleanField()

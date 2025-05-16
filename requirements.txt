@@ -22,5 +22,5 @@ arrow==1.2.3
 phonenumbers==8.13.13
 
 setuptools
-psycopg2
+psycopg2-binary>=2.9
 drf-yasg
