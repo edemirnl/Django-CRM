@@ -376,4 +376,23 @@ class UserUpdateStatusSwaggerSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(choices = STATUS_CHOICES,required=True)
 
+# serializer for Customized_login
+class CustomLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        if not email or not password:
+            raise serializers.ValidationError("Email and password are required.")
+
+        user = authenticate(username=email, password=password)
+        if not user:
+            raise serializers.ValidationError("Invalid email or password.")
+        if not user.is_active:
+            raise serializers.ValidationError("User is not active.")
+        attrs['user'] = user
+        return attrs
+        
