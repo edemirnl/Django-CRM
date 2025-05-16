@@ -64,6 +64,12 @@ from opportunity.models import Opportunity
 from opportunity.serializer import OpportunitySerializer
 from teams.models import Teams
 from teams.serializer import TeamsSerializer
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from common.models import GoogleAuthConfig
+
 
 
 class GetTeamsAndUsersView(APIView):
@@ -933,3 +939,22 @@ class CustomLoginView(APIView):
             }
             return Response(response)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GoogleAuthConfigView(APIView):
+    def get(self, request):
+        config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
+        return Response({"google_enabled": config.google_enabled})
+
+    @extend_schema(
+        request=GoogleAuthConfigSerializer,
+        responses={200: GoogleAuthConfigSerializer}
+    )
+    def put(self, request):
+        config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
+        new_value = request.data.get("google_enabled")
+        if isinstance(new_value, bool):
+            config.google_enabled = new_value
+            config.save()
+            return Response({"google_enabled": config.google_enabled}, status=200)
+        return Response({"error": "Invalid value"}, status=400)
