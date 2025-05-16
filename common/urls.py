@@ -13,6 +13,7 @@ urlpatterns = [
         jwt_views.TokenRefreshView.as_view(),
         name="token_refresh",
     ),
+    path('api/token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
     # GoogleLoginView
     path("auth/google/", views.GoogleLoginView.as_view()),
     path("auth/google-auth-config/", views.GoogleAuthConfigView.as_view(), name="auth-config"),
