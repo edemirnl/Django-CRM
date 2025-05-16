@@ -418,4 +418,6 @@ class CustomLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("User is not active.")
         attrs['user'] = user
         return attrs
+class GoogleAuthConfigSerializer(serializers.Serializer):
+    google_enabled = serializers.BooleanField()
         
