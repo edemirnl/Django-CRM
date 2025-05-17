@@ -168,8 +168,9 @@ class UsersListView(APIView, LimitOffsetPagination):
                         role=params.get("role"),
                         address=address_obj,
                         org=request.profile.org,
+                        phone = params.get("phone"),
+                        alternate_phone = params.get("alternate_phone")
                     )
-
                     # send_email_to_new_user.delay(
                     #     profile.id,
                     #     request.profile.org.id,
@@ -282,7 +283,7 @@ class UserDetailView(APIView):
         context["assigned_data"] = assigned_data
         comments = profile_obj.user_comments.all()
         context["comments"] = CommentSerializer(comments, many=True).data
-        context["countries"] = COUNTRIES
+        #context["countries"] = COUNTRIES
         return Response(
             {"error": False, "data": context},
             status=status.HTTP_200_OK,
@@ -330,6 +331,8 @@ class UserDetailView(APIView):
             address_obj = address_serializer.save()
             user = serializer.save()
             user.email = user.email
+            user.username = user.username
+            user.set_password(params.get("password"))
             user.save()
         if profile_serializer.is_valid():
             profile = profile_serializer.save()
@@ -358,11 +361,19 @@ class UserDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         deleted_by = self.request.profile.user.email
-        send_email_user_delete.delay(
-            self.object.user.email,
-            deleted_by=deleted_by,
-        )
+        # send_email_user_delete.delay(
+        #     self.object.user.email,
+        #     deleted_by=deleted_by,
+        # )
+
+        user = self.object.user
+        address = self.object.address
         self.object.delete()
+        if user:
+            user.delete()
+
+        if address:
+            address.delete()
         return Response({"status": "success"}, status=status.HTTP_200_OK)
 
 
