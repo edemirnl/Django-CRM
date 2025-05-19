@@ -961,8 +961,46 @@ class GoogleLoginView(APIView):
         response['refresh_token'] = str(token)
         response['user_id'] = user.id
         return Response(response)
+# custom login endpoint
+from .serializer import CustomLoginSerializer
 
-
+class CustomLoginView(APIView):
+    @extend_schema(
+        description="Login with email and password and receive user details if it exists.",
+        parameters=[
+            OpenApiParameter(
+                name="email",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="User email address"
+            ),
+            OpenApiParameter(
+                name="password",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="User password"
+            ),
+        ],
+        responses={
+            200: CustomLoginSerializer,
+            400: None,
+            404: None
+        }
+    )
+    def get(self, request):
+       
+        serializer = CustomLoginSerializer(data=request.query_params)
+        if serializer.is_valid():
+            user_obj = serializer.validated_data['user']
+            return Response({
+                "username": user_obj.username,
+                "email": user_obj.email,
+                "profile_pic": user_obj.profile_pic,
+                "user_id": user_obj.id
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 class GoogleAuthConfigView(APIView):
     def get(self, request):
         config, _ = GoogleAuthConfig.objects.get_or_create(id=1)

@@ -7,6 +7,7 @@ app_name = "api_common"
 
 
 urlpatterns = [
+    path("auth/login/", views.CustomLoginView.as_view(), name="login"),
     path("dashboard/", views.ApiHomeView.as_view()),
     path(
         "auth/refresh-token/",
@@ -28,4 +29,5 @@ urlpatterns = [
     path("api-settings/", views.DomainList.as_view()),
     path("api-settings/<str:pk>/", views.DomainDetailView.as_view()),
     path("user/<str:pk>/status/", views.UserStatusView.as_view()),
+   
 ]

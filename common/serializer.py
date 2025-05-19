@@ -1,6 +1,6 @@
 import re
 
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
@@ -411,6 +411,32 @@ class UserUpdateStatusSwaggerSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(choices = STATUS_CHOICES,required=True)
 
+# serializer for Customized_login
+class CustomLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+        User = get_user_model()
+
+        if not email or not password:
+            raise serializers.ValidationError("Email and password is required.")
+
+        try:
+           user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Incorrect email or password.")
+
+        if not check_password(password, user.password):
+            raise serializers.ValidationError("Incorrect email or password.")
+
+        if not user.is_active:
+            raise serializers.ValidationError("User is not active.")
+
+        attrs['user'] = user
+        return attrs
 class GoogleAuthConfigSerializer(serializers.Serializer):
     google_enabled = serializers.BooleanField()
+        
