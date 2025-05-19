@@ -921,26 +921,37 @@ class GoogleLoginView(APIView):
         return Response(response)
 # custom login endpoint
 from .serializer import CustomLoginSerializer
+
 class CustomLoginView(APIView):
     @extend_schema(
-        description="Login using email and password",
-        request=CustomLoginSerializer,
+        description="Login with email (GET) and receive user details if email exists.",
+        parameters=[
+            OpenApiParameter(
+                name="email",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="User email address"
+            )
+        ],
+        responses={
+            200: CustomLoginSerializer,
+            400: None,
+            404: None
+        }
     )
-    def post(self, request):  
-        serializer = CustomLoginSerializer(data=request.data)
+    def get(self, request):
+       
+        serializer = CustomLoginSerializer(data=request.query_params)
         if serializer.is_valid():
-            user = serializer.validated_data['user']
-            token = RefreshToken.for_user(user)
-            response = {
-                'email': user.email,
-                'access_token': str(token.access_token),
-                'refresh_token': str(token),
-                'user_id': user.id,
-            }
-            return Response(response)
+            user_obj = serializer.validated_data['user']
+            return Response({
+                "username": user_obj.username,
+                "email": user_obj.email,
+                "profile_pic": user_obj.profile_pic,
+                "user_id": user_obj.id
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 class GoogleAuthConfigView(APIView):
     def get(self, request):
         config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
