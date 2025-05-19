@@ -1,6 +1,6 @@
 import re
 
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
@@ -414,17 +414,23 @@ class UserUpdateStatusSwaggerSerializer(serializers.Serializer):
 # serializer for Customized_login
 class CustomLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, attrs):
         email = attrs.get("email")
+        password = attrs.get("password")
+        User = get_user_model()
 
-        if not email:
-            raise serializers.ValidationError("Email is required.")
+        if not email or not password:
+            raise serializers.ValidationError("Email and password is required.")
 
         try:
-            user = User.objects.get(email=email)
+           user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError("No user found with this email.")
+            raise serializers.ValidationError("Incorrect email or password.")
+
+        if not check_password(password, user.password):
+            raise serializers.ValidationError("Incorrect email or password.")
 
         if not user.is_active:
             raise serializers.ValidationError("User is not active.")

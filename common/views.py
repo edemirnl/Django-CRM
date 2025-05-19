@@ -966,7 +966,7 @@ from .serializer import CustomLoginSerializer
 
 class CustomLoginView(APIView):
     @extend_schema(
-        description="Login with email (GET) and receive user details if email exists.",
+        description="Login with email and password and receive user details if it exists.",
         parameters=[
             OpenApiParameter(
                 name="email",
@@ -974,7 +974,14 @@ class CustomLoginView(APIView):
                 location=OpenApiParameter.QUERY,
                 required=True,
                 description="User email address"
-            )
+            ),
+            OpenApiParameter(
+                name="password",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="User password"
+            ),
         ],
         responses={
             200: CustomLoginSerializer,
