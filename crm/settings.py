@@ -122,7 +122,7 @@ WSGI_APPLICATION = "crm.wsgi.application"
 # https://docs.djangoproject.com/en/1.10/ref/settings/#databases
 
 DATABASES = {
-    "default": {
+    'default': {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ["DBNAME"],
         "USER": os.environ["DBUSER"],

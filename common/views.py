@@ -64,6 +64,12 @@ from opportunity.models import Opportunity
 from opportunity.serializer import OpportunitySerializer
 from teams.models import Teams
 from teams.serializer import TeamsSerializer
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from common.models import GoogleAuthConfig
+
 
 
 class GetTeamsAndUsersView(APIView):
@@ -83,6 +89,37 @@ class GetTeamsAndUsersView(APIView):
         data["profiles"] = profiles_data
         return Response(data)
 
+
+class AdminSignupView(APIView):
+    @extend_schema(request=AdminCreateSwaggerSerializer)
+    def post(self, request, format=None):
+        if User.objects.exists():
+            return Response(
+                {"error": "Admin sign up not allowed."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        else:
+            params = request.data
+            if params:
+                user_serializer = CreateUserSerializer(data=params)
+                data = {}
+                if not user_serializer.is_valid():
+                    data["user_errors"] = dict(user_serializer.errors)
+                if data:
+                    return Response(
+                        {"error": True, "errors": data},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+               
+                admin = user_serializer.save(is_active=True)
+                admin.set_password(params.get("password"))
+                admin.save()
+               
+                return Response(
+                    {"error": False, "message": "User Created Successfully"},
+                    status=status.HTTP_201_CREATED,
+                )
+    
 
 class UsersListView(APIView, LimitOffsetPagination):
 
@@ -119,6 +156,8 @@ class UsersListView(APIView, LimitOffsetPagination):
                         is_active=True,
                     )
                     user.email = user.email
+                    user.username = user.username
+                    user.set_password(params.get("password"))
                     user.save()
                     # if params.get("password"):
                     #     user.set_password(params.get("password"))
@@ -129,8 +168,9 @@ class UsersListView(APIView, LimitOffsetPagination):
                         role=params.get("role"),
                         address=address_obj,
                         org=request.profile.org,
+                        phone = params.get("phone"),
+                        alternate_phone = params.get("alternate_phone")
                     )
-
                     # send_email_to_new_user.delay(
                     #     profile.id,
                     #     request.profile.org.id,
@@ -243,7 +283,7 @@ class UserDetailView(APIView):
         context["assigned_data"] = assigned_data
         comments = profile_obj.user_comments.all()
         context["comments"] = CommentSerializer(comments, many=True).data
-        context["countries"] = COUNTRIES
+        #context["countries"] = COUNTRIES
         return Response(
             {"error": False, "data": context},
             status=status.HTTP_200_OK,
@@ -291,6 +331,8 @@ class UserDetailView(APIView):
             address_obj = address_serializer.save()
             user = serializer.save()
             user.email = user.email
+            user.username = user.username
+            user.set_password(params.get("password"))
             user.save()
         if profile_serializer.is_valid():
             profile = profile_serializer.save()
@@ -319,11 +361,19 @@ class UserDetailView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         deleted_by = self.request.profile.user.email
-        send_email_user_delete.delay(
-            self.object.user.email,
-            deleted_by=deleted_by,
-        )
+        # send_email_user_delete.delay(
+        #     self.object.user.email,
+        #     deleted_by=deleted_by,
+        # )
+
+        user = self.object.user
+        address = self.object.address
         self.object.delete()
+        if user:
+            user.delete()
+
+        if address:
+            address.delete()
         return Response({"status": "success"}, status=status.HTTP_200_OK)
 
 
@@ -898,6 +948,7 @@ class GoogleLoginView(APIView):
         except User.DoesNotExist:
             user = User()
             user.email = data['email']
+            user.username = f"user_{user.id.hex[:8]}"
             user.profile_pic = data['picture']
             # provider random default password
             user.password = make_password(BaseUserManager().make_random_password())
@@ -910,3 +961,60 @@ class GoogleLoginView(APIView):
         response['refresh_token'] = str(token)
         response['user_id'] = user.id
         return Response(response)
+# custom login endpoint
+from .serializer import CustomLoginSerializer
+
+class CustomLoginView(APIView):
+    @extend_schema(
+        description="Login with email and password and receive user details if it exists.",
+        parameters=[
+            OpenApiParameter(
+                name="email",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="User email address"
+            ),
+            OpenApiParameter(
+                name="password",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="User password"
+            ),
+        ],
+        responses={
+            200: CustomLoginSerializer,
+            400: None,
+            404: None
+        }
+    )
+    def get(self, request):
+       
+        serializer = CustomLoginSerializer(data=request.query_params)
+        if serializer.is_valid():
+            user_obj = serializer.validated_data['user']
+            return Response({
+                "username": user_obj.username,
+                "email": user_obj.email,
+                "profile_pic": user_obj.profile_pic,
+                "user_id": user_obj.id
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class GoogleAuthConfigView(APIView):
+    def get(self, request):
+        config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
+        return Response({"google_enabled": config.google_enabled})
+
+    @extend_schema(
+        request=GoogleAuthConfigSerializer,
+        responses={200: GoogleAuthConfigSerializer}
+    )
+    def put(self, request):
+        config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
+        new_value = request.data.get("google_enabled")
+        if isinstance(new_value, bool):
+            config.google_enabled = new_value
+            config.save()
+            return Response({"google_enabled": config.google_enabled}, status=200)
+        return Response({"error": "Invalid value"}, status=400)

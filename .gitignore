@@ -27,3 +27,4 @@ staticfiles
 .venv
 myvenv/
 .python-version
+venv

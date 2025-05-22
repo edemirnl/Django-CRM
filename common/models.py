@@ -35,7 +35,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(
         default=uuid.uuid4, unique=True, editable=False, db_index=True, primary_key=True
     )
-    email = models.EmailField(_("email address"), blank=True, unique=True)
+    username = models.CharField(max_length=20, blank=False, unique=True, null=False)
+    email = models.EmailField(_("email address"), blank=False, unique=True, null=False)
     profile_pic = models.CharField(
         max_length=1000, null=True, blank=True
     )
@@ -586,3 +587,10 @@ class APISettings(BaseModel):
         if not self.apikey or self.apikey is None or self.apikey == "":
             self.apikey = generate_key()
         super().save(*args, **kwargs)
+
+
+class GoogleAuthConfig(models.Model):
+    google_enabled = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Google login enabled: {self.google_enabled}"
