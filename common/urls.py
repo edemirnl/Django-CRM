@@ -7,6 +7,7 @@ app_name = "api_common"
 
 
 urlpatterns = [
+    path("auth/activate-user/", views.UserActivate.as_view()),
     path("auth/login/", views.CustomLoginView.as_view(), name="login"),
     path("dashboard/", views.ApiHomeView.as_view()),
     path(
