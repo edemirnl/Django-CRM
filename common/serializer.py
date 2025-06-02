@@ -440,3 +440,13 @@ class CustomLoginSerializer(serializers.Serializer):
 class GoogleAuthConfigSerializer(serializers.Serializer):
     google_enabled = serializers.BooleanField()
         
+
+class ActivateUserSwaggerSerializer(serializers.Serializer):
+    """
+    It is swagger for activate new user and set new password
+    """
+
+    uid = serializers.CharField(max_length=1000,required=True)
+    token = serializers.CharField(max_length=1000,required=True)
+    old_password = serializers.CharField(max_length=1000,required=True)
+    new_password = serializers.CharField(max_length=1000,required=True)
