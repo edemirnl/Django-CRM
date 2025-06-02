@@ -3,6 +3,7 @@ import secrets
 from multiprocessing import context
 #from re import template
 import re
+from datetime import datetime
 
 import requests
 from django.contrib.auth.base_user import BaseUserManager
@@ -153,7 +154,7 @@ class UsersListView(APIView, LimitOffsetPagination):
                 if address_serializer.is_valid():
                     address_obj = address_serializer.save()
                     user = user_serializer.save(
-                        is_active=True,
+                        is_active=False,
                     )
                     user.email = user.email
                     user.username = user.username
@@ -171,6 +172,7 @@ class UsersListView(APIView, LimitOffsetPagination):
                         phone = params.get("phone"),
                         alternate_phone = params.get("alternate_phone")
                     )
+                    send_email_to_new_user(user.id)
                     # send_email_to_new_user.delay(
                     #     profile.id,
                     #     request.profile.org.id,
@@ -1018,3 +1020,46 @@ class GoogleAuthConfigView(APIView):
             config.save()
             return Response({"google_enabled": config.google_enabled}, status=200)
         return Response({"error": "Invalid value"}, status=400)
+
+
+class UserActivate(APIView):
+    @extend_schema(request=ActivateUserSwaggerSerializer)
+    def post(self, request, format=None):
+        uid = request.data.get("uid")
+        token = request.data.get("token")
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+
+        if not all([uid, token, old_password, new_password ]):
+            return Response({"detail": "Missing data"}, status=400)
+
+        
+        uid_decoded = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=uid_decoded)
+
+        if not user:
+            return Response({"detail": "Invalid Uid"}, status=400)
+
+        activation_str = user.activation_key
+        if not activation_str:
+            return Response({"detail": "Activation link is already used"}, status=400)
+        
+        activation_time = datetime.strptime(activation_str, "%Y-%m-%d-%H-%M-%S")
+
+        if timezone.now() > timezone.make_aware(activation_time):
+            return Response({"detail": "Activation link is expired"}, status=400)
+        
+        if not account_activation_token.check_token(user, token):
+            return Response({"detail": "Invalid token"}, status=400) 
+
+        if not user.check_password(old_password):
+            return Response({"detail": "Incorrect current password."}, status=400)
+    
+        user.set_password(new_password)
+        user.is_active = True
+        user.activation_key = None 
+        user.save()
+
+        return Response({"detail": "Password set and account activated"}, status=200)
+
+        

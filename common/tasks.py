@@ -27,20 +27,19 @@ def send_email_to_new_user(user_id):
         context["url"] = settings.DOMAIN_NAME
         context["uid"] = (urlsafe_base64_encode(force_bytes(user_obj.pk)),)
         context["token"] = account_activation_token.make_token(user_obj)
-        time_delta_two_hours = datetime.datetime.strftime(
-            timezone.now() + datetime.timedelta(hours=2), "%Y-%m-%d-%H-%M-%S"
+        time_delta = datetime.datetime.strftime(
+            timezone.now() + datetime.timedelta(hours=24), "%Y-%m-%d-%H-%M-%S"
         )
         # creating an activation token and saving it in user model
-        activation_key = context["token"] + time_delta_two_hours
+        activation_key = time_delta
         user_obj.activation_key = activation_key
         user_obj.save()
 
         context["complete_url"] = context[
             "url"
-        ] + "/auth/activate-user/{}/{}/{}/".format(
+        ] + "/activate-user/{}/{}/".format(
             context["uid"][0],
             context["token"],
-            activation_key,
         )
         recipients = [
             user_email,
