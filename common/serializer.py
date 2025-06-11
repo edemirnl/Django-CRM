@@ -3,7 +3,9 @@ import re
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from common.utils import COUNTRIES
@@ -450,3 +452,64 @@ class ActivateUserSwaggerSerializer(serializers.Serializer):
     token = serializers.CharField(max_length=1000,required=True)
     old_password = serializers.CharField(max_length=1000,required=True)
     new_password = serializers.CharField(max_length=1000,required=True)
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+
+    """
+    It is a swagger for requesting a password reset.
+    """
+
+    email = serializers.EmailField()
+    def validate(self, attrs):
+        email = attrs.get("email")
+        if not email:
+            raise serializers.ValidationError("Email is required.")
+        User = get_user_model()
+        if not User.objects.filter(email=email).exists():
+            raise serializers.ValidationError("User with this email does not exist.")
+        return attrs
+    def save(self):
+        request = self.context.get('request')
+        email = self.validated_data['email']
+        user = User.objects.get(email=email)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_link = f"{request.scheme}://{request.get_host()}/reset-password-confirm/{uid}/{token}/"
+
+        send_mail(
+            subject="Password Reset",
+            message=f"Use the following link to reset your password: {reset_link}",
+            from_email="bottlecrm@gmail.com",
+            recipient_list=[email]
+        )
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """
+    It is a swagger for confirming a password reset.
+    """
+
+    uid = serializers.CharField(max_length=1000, required=True)
+    token = serializers.CharField(max_length=1000, required=True)
+    new_password = serializers.CharField(max_length=1000, required=True)
+
+    def validate(self, attrs):
+        uid = attrs.get("uid")
+        token = attrs.get("token")
+        new_password = attrs.get("new_password")
+
+        if not uid or not token or not new_password:
+            raise serializers.ValidationError("All fields are required.")
+
+        User = get_user_model()
+        try:
+            user_id = urlsafe_base64_decode(uid).decode()
+            self.user = User.objects.get(pk=user_id)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError("Invalid UID.")
+
+        if not default_token_generator.check_token(self.user, token):
+            raise serializers.ValidationError("Invalid token.")
+
+        return attrs
+    def save(self):
+        self.user.set_password(self.validated_data['new_password'])
+        self.user.save()

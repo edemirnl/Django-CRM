@@ -1061,5 +1061,21 @@ class UserActivate(APIView):
         user.save()
 
         return Response({"detail": "Password set and account activated"}, status=200)
-
+class PasswordResetRequestView(APIView):
+    @extend_schema(request= PasswordResetRequestSerializer)
         
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+class PasswordResetConfirmView(APIView):
+    @extend_schema(request=PasswordResetConfirmSerializer)
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Password has been reset."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
