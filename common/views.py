@@ -4,6 +4,7 @@ from multiprocessing import context
 #from re import template
 import re
 from datetime import datetime
+from role_permission_control.models import Role, Permission, RolePermission
 
 import requests
 from django.contrib.auth.base_user import BaseUserManager
@@ -442,10 +443,10 @@ class OrgProfileCreateView(APIView):
             org_obj = serializer.save()
 
             # now creating the profile
-            profile_obj = self.model2.objects.create(user=request.user, org=org_obj)
+            admin_role = Role.objects.get(name="Admin")
+            profile_obj = self.model2.objects.create(user=request.user, org=org_obj , role= admin_role)
             # now the current user is the admin of the newly created organisation
             profile_obj.is_organization_admin = True
-            profile_obj.role = 'ADMIN'
             profile_obj.save()
 
             return Response(
