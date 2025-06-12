@@ -7,6 +7,7 @@ from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from common.utils import COUNTRIES
+from role_permission_control.models import Role
 
 from common.models import (
     Address,
@@ -205,16 +206,24 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ["id","username","email","profile_pic"] 
 
 
+class RoleSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Role
+        fields = ["id","name","description"] 
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     # address = BillingAddressSerializer()
     user_details = UserSerializer(source="user", read_only=True)
+    role_details = RoleSerializer(source="role", read_only=True)
 
     class Meta:
         model = Profile
         fields = (
             "id",
             "user_details",
-            "role",
+            "role_details",
             "address",
             "has_marketing_access",
             "has_sales_access",

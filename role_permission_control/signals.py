@@ -31,7 +31,7 @@ def seed_rbac_data(sender, app_config, verbosity, interactive, **kwargs):
     with transaction.atomic(): # Ensure atomicity of the seeding process
 
         roles_to_create = {
-            'Admin': 'Full system access, including user management and system settings.',
+            'ADMIN': 'Full system access, including user management and system settings.',
             'Sales Manager': 'Manages everything, but cannot manage users.',
             'Sales Representative': 'Manages their own resource.',
             'Generic Employee': 'Read-only access to basic contact information.'
@@ -177,7 +177,7 @@ def seed_rbac_data(sender, app_config, verbosity, interactive, **kwargs):
 
         # Map permissions to roles in the RolePermission table
         role_permission_mappings = {
-            'Admin': admin_perms,
+            'ADMIN': admin_perms,
             'Sales Manager': sales_manager_perms,
             'Sales Representative': sales_rep_perms,
             'Generic Employee': generic_employee_perms,
