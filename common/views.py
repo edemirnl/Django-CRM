@@ -1062,13 +1062,14 @@ class UserActivate(APIView):
 
         return Response({"detail": "Password set and account activated"}, status=200)
 class PasswordResetRequestView(APIView):
+    
     @extend_schema(request= PasswordResetRequestSerializer)
         
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
+           send_email_to_reset_password(request.data.get("email"))
+           return Response({"message": "Password reset email sent."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
 class PasswordResetConfirmView(APIView):
@@ -1076,6 +1077,28 @@ class PasswordResetConfirmView(APIView):
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+        
+            user_id = urlsafe_base64_decode(request.data.get("uid")).decode()
+            user = User.objects.get(pk=user_id)
+            if not user:
+                return Response({"error": "Invalid value"}, status=400)
+        
+            activation_str = user.activation_key
+            if not activation_str:
+                return Response({"detail": "password reset link is already used"}, status=400)
+            activation_time = datetime.strptime(activation_str, "%Y-%m-%d-%H-%M-%S")
+            activation_time_aware = timezone.make_aware(activation_time, timezone.utc)
+            if timezone.now() > activation_time_aware:
+                print(timezone.now())
+                print(user.activation_key)
+                return Response({"detail": "password reset link is expired"}, status=400)
+
+            if not account_activation_token.check_token(user, request.data.get("token")):
+                raise serializers.ValidationError("Invalid token.")
+        
+            
+            user.set_password(request.data.get("new_password"))
+            user.activation_key = None 
+            user.save()
             return Response({"message": "Password has been reset."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
