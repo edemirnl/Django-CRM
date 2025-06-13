@@ -128,7 +128,7 @@ class UsersListView(APIView, LimitOffsetPagination):
     permission_classes = (IsAuthenticated,)
     @extend_schema(parameters=swagger_params1.organization_params,request=UserCreateSwaggerSerializer)
     def post(self, request, format=None):
-        print(request.profile.role, request.user.is_superuser)
+        print(request.profile.role.name, request.user.is_superuser)
         if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
             return Response(
                 {"error": True, "errors": "Permission Denied"},
@@ -164,7 +164,7 @@ class UsersListView(APIView, LimitOffsetPagination):
                     # if params.get("password"):
                     #     user.set_password(params.get("password"))
                     #     user.save()
-                    user_role = Role.objects.get(params.get("role"))
+                    user_role = Role.objects.get(name=params.get("role"))
                     if not user_role:
                         return Response(
                         {"error": True, "errors": "Role is not defined"},

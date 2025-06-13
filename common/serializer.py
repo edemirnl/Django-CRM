@@ -181,6 +181,11 @@ class CreateUserSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError(", ".join(str(item) for item in errors))
 
 class CreateProfileSerializer(serializers.ModelSerializer):
+    role = serializers.SlugRelatedField(
+        slug_field='name',  
+        queryset=Role.objects.all()
+    )
+
     class Meta:
         model = Profile
         fields = (
@@ -389,12 +394,13 @@ class UserCreateSwaggerSerializer(serializers.Serializer):
     """
     It is swagger for creating or updating user
     """
-    ROLE_CHOICES = ["ADMIN", "USER"]
+    #ROLE_CHOICES = ["ADMIN", "USER"]
 
     username = serializers.CharField(max_length=1000,required=True)
     email = serializers.CharField(max_length=1000,required=True)
     password = serializers.CharField(max_length=1000)
-    role = serializers.ChoiceField(choices = ROLE_CHOICES,required=True)
+    #role = serializers.ChoiceField(choices = ROLE_CHOICES,required=True)
+    role = serializers.CharField(max_length=1000,required=True)
     phone = serializers.CharField(max_length=12)
     alternate_phone = serializers.CharField(max_length=12)
     address_line = serializers.CharField(max_length=10000,required=True)
