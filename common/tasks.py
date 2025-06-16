@@ -243,28 +243,64 @@ def resend_activation_link_to_user(
 
 @app.task
 def send_email_to_reset_password(user_email):
-    """Send Mail To Users When their account is created"""
-    user = User.objects.filter(email=user_email).first()
-    context = {}
-    context["user_email"] = user_email
-    context["url"] = settings.DOMAIN_NAME
-    context["uid"] = (urlsafe_base64_encode(force_bytes(user.pk)),)
-    context["token"] = default_token_generator.make_token(user)
-    context["token"] = context["token"]
-    context["complete_url"] = context[
-        "url"
-    ] + "/auth/reset-password/{uidb64}/{token}/".format(
-        uidb64=context["uid"][0], token=context["token"]
-    )
-    subject = "Set a New Password"
-    recipients = []
-    recipients.append(user_email)
-    html_content = render_to_string(
-        "registration/password_reset_email.html", context=context
-    )
-    if recipients:
+    # """Send Mail To Users When their account is created"""
+    # user = User.objects.filter(email=user_email).first()
+    # context = {}
+    # context["user_email"] = user_email
+    # context["url"] = settings.DOMAIN_NAME
+    # context["uid"] = (urlsafe_base64_encode(force_bytes(user.pk)),)
+    # context["token"] = default_token_generator.make_token(user)
+    # context["token"] = context["token"]
+    # context["complete_url"] = context[
+    #     "url"
+    # ] + "/auth/reset-password/{uidb64}/{token}/".format(
+    #     uidb64=context["uid"][0], token=context["token"]
+    # )
+    # subject = "Set a New Password"
+    # recipients = []
+    # recipients.append(user_email)
+    # html_content = render_to_string(
+    #     "registration/password_reset_email.html", context=context
+    # )
+    # if recipients:
+    #     msg = EmailMessage(
+    #         subject, html_content, from_email=settings.DEFAULT_FROM_EMAIL, to=recipients
+    #     )
+    #     msg.content_subtype = "html"
+    #     msg.send()
+    user_obj = User.objects.filter(email=user_email).first()
+
+    if user_obj:
+        context = {}
+        user_email = user_obj.email
+        context["url"] = settings.DOMAIN_NAME
+        context["uid"] = (urlsafe_base64_encode(force_bytes(user_obj.pk)),)
+        context["token"] = account_activation_token.make_token(user_obj)
+        time_delta = datetime.datetime.strftime(
+            timezone.now() + datetime.timedelta(hours=1), "%Y-%m-%d-%H-%M-%S"
+        )
+        # creating an activation token and saving it in user model
+        activation_key = time_delta
+        user_obj.activation_key = activation_key
+        user_obj.save()
+
+        context["complete_url"] = context[
+            "url"
+        ] + "/reset-password/{}/{}/".format(
+            context["uid"][0],
+            context["token"],
+        )
+        recipients = [
+            user_email,
+        ]
+        subject = "Welcome to Bottle CRM"
+        html_content = render_to_string("new_password_reset.html", context=context)
+
         msg = EmailMessage(
-            subject, html_content, from_email=settings.DEFAULT_FROM_EMAIL, to=recipients
+            subject,
+            html_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=recipients,
         )
         msg.content_subtype = "html"
         msg.send()
