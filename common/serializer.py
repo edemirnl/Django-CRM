@@ -1,14 +1,21 @@
 import re
+from datetime import datetime
 
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework.response import Response
 from common.utils import COUNTRIES
+from common.tasks import send_email_to_reset_password
+from django.utils import timezone
+from common.token_generator import account_activation_token
 from role_permission_control.models import Role
-
 from common.models import (
     Address,
     APISettings,
@@ -465,3 +472,75 @@ class ActivateUserSwaggerSerializer(serializers.Serializer):
     token = serializers.CharField(max_length=1000,required=True)
     old_password = serializers.CharField(max_length=1000,required=True)
     new_password = serializers.CharField(max_length=1000,required=True)
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+
+    """
+    It is a swagger for requesting a password reset.
+    """
+
+    email = serializers.EmailField()
+    def validate(self, attrs):
+        email = attrs.get("email")
+        if not email:
+            raise serializers.ValidationError("Email is required.")
+        User = get_user_model()
+        if not User.objects.filter(email=email).exists():
+            raise serializers.ValidationError("User with this email does not exist.")
+        return attrs
+    # def save(self):
+    #     request = self.context.get('request')
+    #     email = self.validated_data['email']
+    #     user = User.objects.get(email=email)
+    #     uid = urlsafe_base64_encode(force_bytes(user.pk))
+    #     token = default_token_generator.make_token(user)
+        #reset_link = f"{request.scheme}://{request.get_host()}/reset-password-confirm/{uid}/{token}/"
+
+        #send_email_to_reset_password(email)
+    
+        # send_mail(
+        #     subject="Password Reset",
+        #     message=f"Use the following link to reset your password: {reset_link}",
+        #     from_email=settings.DEFAULT_FROM_EMAIL,
+        #     recipient_list=[email]
+        # )
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """
+    It is a swagger for confirming a password reset.
+    """
+
+    uid = serializers.CharField(max_length=1000, required=True)
+    token = serializers.CharField(max_length=1000, required=True)
+    new_password = serializers.CharField(max_length=1000, required=True)
+
+    def validate(self, attrs):
+        uid = attrs.get("uid")
+        token = attrs.get("token")
+        new_password = attrs.get("new_password")
+
+        if not uid or not token or not new_password:
+            raise serializers.ValidationError("All fields are required.")
+        return attrs
+
+        # User = get_user_model()
+
+        # try:
+        #     user_id = urlsafe_base64_decode(uid).decode()
+        #     self.user = User.objects.get(pk=user_id)
+           
+        # except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        #     raise serializers.ValidationError("Invalid UID.")
+        # activation_str = self.user.activation_key
+        # if not activation_str:
+        #     return Response({"detail": "password reset link is already used"}, status=400)
+        # activation_time = datetime.strptime(activation_str, "%Y-%m-%d-%H-%M-%S")
+        # if timezone.now() > timezone.make_aware(activation_time):
+        #     return Response({"detail": "password reset link is expired"}, status=400)
+
+        # if not account_activation_token.check_token(self.user, token):
+        #     raise serializers.ValidationError("Invalid token.")
+    
+        # def save(self):
+        #  self.user.set_password(new_password)
+        #  self.user.activation_key = None 
+        #  self.user.save()
