@@ -343,7 +343,9 @@ class UserDetailView(APIView):
             user = serializer.save()
             user.email = user.email
             user.username = user.username
-            user.set_password(params.get("password"))
+            password = params.get("password")
+            if password:
+                user.set_password(password)
             user.save()
         if profile_serializer.is_valid():
             profile = profile_serializer.save()

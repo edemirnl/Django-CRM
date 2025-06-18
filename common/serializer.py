@@ -117,14 +117,14 @@ class ShowOrganizationListSerializer(serializers.ModelSerializer):
 
 
 class BillingAddressSerializer(serializers.ModelSerializer):
-    country_display  = serializers.SerializerMethodField(read_only=True)
+    #country_display  = serializers.SerializerMethodField(read_only=True)
 
-    def get_country(self, obj):
-        return obj.get_country_display()
+    #def get_country(self, obj):
+    #    return obj.get_country_display()
 
     class Meta:
         model = Address
-        fields = ("address_line", "street", "city", "state", "postcode", "country", "country_display")
+        fields = ("address_line", "street", "city", "state", "postcode", "country")
 
     def __init__(self, *args, **kwargs):
         account_view = kwargs.pop("account", False)
@@ -156,7 +156,13 @@ class CreateUserSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         self.fields["email"].required = True
         self.fields["username"].required = True
-        self.fields["password"].required = True
+        #self.fields["password"].required = True
+        # Only require password if it's a create operation
+        if self.instance is None:
+            self.fields["password"].required = True
+        else:
+            self.fields["password"].required = False
+            self.fields["password"].allow_blank = True
 
     # def validate_email(self, email):
     #     if self.instance:
@@ -226,7 +232,7 @@ class RoleSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
-    # address = BillingAddressSerializer()
+    address = BillingAddressSerializer( read_only=True)
     user_details = UserSerializer(source="user", read_only=True)
     role_details = RoleSerializer(source="role", read_only=True)
 
@@ -240,6 +246,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "has_marketing_access",
             "has_sales_access",
             "phone",
+            "alternate_phone",
             "date_of_joining",
             "is_active",
         )
