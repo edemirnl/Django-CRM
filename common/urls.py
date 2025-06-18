@@ -3,10 +3,13 @@ from rest_framework_simplejwt import views as jwt_views
 
 from common import views
 
+
 app_name = "api_common"
 
 
 urlpatterns = [
+    path('reset-password/', views.PasswordResetRequestView.as_view(), name='password-reset'),
+    path('reset-password-confirm/', views.PasswordResetConfirmView.as_view(), name='password-reset-confirm'),
     path("auth/activate-user/", views.UserActivate.as_view()),
     path("auth/login/", views.CustomLoginView.as_view(), name="login"),
     path("dashboard/", views.ApiHomeView.as_view()),

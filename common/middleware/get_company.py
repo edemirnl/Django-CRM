@@ -29,6 +29,7 @@ class GetProfileAndOrg(object):
         try:
             request.profile = None
             user_id = None
+<<<<<<< add-leads
 
             # Handle JWT token from "Authorization" header
             if request.headers.get("Authorization"):
@@ -42,6 +43,18 @@ class GetProfileAndOrg(object):
 
             # Handle API key authentication (optional)
             api_key = request.headers.get('Token')
+=======
+            # here I am getting the jwt token passing in header
+            if request.headers.get("Authorization"):
+                token1 = request.headers.get("Authorization", "")
+                if token1.startswith("Bearer "):
+                    token = token1.split(" ")[1]  # getting the token value
+                    decoded = jwt.decode(token, (settings.SECRET_KEY), algorithms=[settings.JWT_ALGO])
+                    user_id = decoded['user_id']
+                else:
+                    raise PermissionDenied("Invalid or missing Authorization header")
+            api_key = request.headers.get('Token')  # Get API key from request query params
+>>>>>>> sprint-5
             if api_key:
                 try:
                     organization = Org.objects.get(api_key=api_key)
