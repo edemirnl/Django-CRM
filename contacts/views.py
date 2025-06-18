@@ -1,4 +1,5 @@
-import json
+import json,csv,io,uuid
+from django.core.cache import cache
 
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -8,6 +9,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import permissions
 
 from common.models import Attachments, Comment, Profile
 from common.serializer import (
@@ -24,7 +26,6 @@ from contacts.serializer import *
 from contacts.tasks import send_email_to_assigned_user
 from tasks.serializer import TaskSerializer
 from teams.models import Teams
-
 
 class ContactsListView(APIView, LimitOffsetPagination):
     #authentication_classes = (CustomDualAuthentication,)
@@ -477,3 +478,55 @@ class ContactAttachmentView(APIView):
             },
             status=status.HTTP_403_FORBIDDEN,
         )
+
+
+# import contact from CSV file
+
+IMPORT_CACHE_TIMEOUT = 600  # seconds (10 minutes)
+
+class ContactCSVPreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    @extend_schema(tags=["contacts"], request=ContactImportPreviewSerializer)
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No CSV file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file.name.endswith('.csv'):
+            return Response({'error': 'File is not a CSV.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        decoded = file.read().decode('utf-8')
+        io_string = io.StringIO(decoded)
+        reader = csv.DictReader(io_string)
+        preview_data = []
+        duplicate_emails = []
+        seen_emails = set()
+        import_id = str(uuid.uuid4())
+
+        for row in reader:
+            email = row.get('email')
+            if not email:
+                continue
+
+            # Detect duplicates in DB or current import
+            if Contact.objects.filter(email=email).exists() or email in seen_emails:
+                duplicate_emails.append(email)
+                continue
+
+            seen_emails.add(email)
+            preview_data.append({
+                'first_name': row.get('first_name', ''),
+                'last_name': row.get('last_name', ''),
+                'email': email,
+                'phone': row.get('phone', ''),
+            })
+
+        # Store in cache for confirmation
+        cache.set(f'import_contacts_{import_id}', preview_data, IMPORT_CACHE_TIMEOUT)
+
+        return Response({
+            'import_id': import_id,
+            'preview': preview_data[:10],  # Show only first 10 for UI
+            'total_preview': len(preview_data),
+            'duplicates': duplicate_emails
+        })

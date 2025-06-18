@@ -119,3 +119,14 @@ class ContactDetailEditSwaggerSerializer(serializers.Serializer):
 
 class ContactCommentEditSwaggerSerializer(serializers.Serializer):
     comment = serializers.CharField()
+
+class ContactImportPreviewSerializer(serializers.Serializer):
+    first_name = serializers.CharField(required=False)
+    last_name = serializers.CharField(required=False)
+    email = serializers.EmailField()
+    phone = serializers.CharField(required=False)
+
+class ContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = '__all__'
