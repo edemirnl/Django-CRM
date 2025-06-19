@@ -245,11 +245,12 @@ class LeadListView(APIView, LimitOffsetPagination):
                         "error": False,
                         "message": "Lead Converted to Account Successfully",
                     },
-                    status=status.HTTP_200_OK,
+                    status=status.HTTP_201_CREATED,
+
                 )
             return Response(
-                {"error": False, "message": "Lead Created Successfully"},
-                status=status.HTTP_200_OK,
+                {"error": False, "message": "Lead Created Successfully", "data": LeadSerializer(lead_obj).data},
+                status=status.HTTP_201_CREATED,
             )
         return Response(
             {"error": True, "errors": serializer.errors},
@@ -438,9 +439,7 @@ class LeadDetailView(APIView):
             lead_obj.tags.clear()
             if params.get("tags"):
                 tags = params.get("tags")
-                # for t in tags:
-                #     tag,_ = Tags.objects.get_or_create(name=t)
-                #     lead_obj.tags.add(tag)
+                
                 for t in tags:
                     tag = Tags.objects.filter(slug=t.lower())
                     if tag.exists():
