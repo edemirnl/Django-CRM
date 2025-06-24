@@ -6,11 +6,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_spectacular.utils import extend_schema
 from common.models import Profile
+from . import swagger_params1
 
 class RoleListAPIView(APIView):
     permission_classes = (IsAuthenticated,)
 
-    @extend_schema(tags=["roles"])
+    @extend_schema(tags=["roles"],parameters=swagger_params1.organization_params)
     def get(self, request):
         if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
             return Response(
