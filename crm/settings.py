@@ -341,3 +341,12 @@ JWT_ALGO = "HS256"
 
 DOMAIN_NAME = os.environ["DOMAIN_NAME"]
 SWAGGER_ROOT_URL = os.environ["SWAGGER_ROOT_URL"]
+
+# Cache settings
+# This is used to cache the import preview data
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'import-cache',
+    }
+}

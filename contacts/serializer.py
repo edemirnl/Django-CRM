@@ -121,10 +121,21 @@ class ContactCommentEditSwaggerSerializer(serializers.Serializer):
     comment = serializers.CharField()
 
 class ContactImportPreviewSerializer(serializers.Serializer):
-    first_name = serializers.CharField(required=False)
-    last_name = serializers.CharField(required=False)
-    email = serializers.EmailField()
-    phone = serializers.CharField(required=False)
+    first_name = serializers.CharField(required=True)
+    last_name = serializers.CharField(required=True)
+    primary_email = serializers.EmailField(required=True)
+    mobile_number = serializers.CharField(required=False)
+    assigned_to = serializers.ListField(
+        child=serializers.IntegerField(), required=False, allow_empty=True, default=list
+    )
+    teams = serializers.ListField(
+        child=serializers.IntegerField(), required=False, allow_empty=True, default=list
+    )
+
+class ContactCSVConfirmSerializer(serializers.Serializer):
+    import_id = serializers.CharField(required=True)
+class ContactCSVUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
 
 class ContactSerializer(serializers.ModelSerializer):
     class Meta:

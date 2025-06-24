@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import permissions
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from common.models import Attachments, Comment, Profile
 from common.serializer import (
@@ -486,7 +487,8 @@ IMPORT_CACHE_TIMEOUT = 600  # seconds (10 minutes)
 
 class ContactCSVPreviewView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    @extend_schema(tags=["contacts"], request=ContactImportPreviewSerializer)
+    parser_classes = [MultiPartParser, FormParser]
+    @extend_schema(tags=["contacts"], request=ContactCSVUploadSerializer)
     def post(self, request):
         file = request.FILES.get('file')
         if not file:
@@ -504,22 +506,38 @@ class ContactCSVPreviewView(APIView):
         import_id = str(uuid.uuid4())
 
         for row in reader:
-            email = row.get('email')
+            email = row.get('primary_email')
             if not email:
                 continue
 
             # Detect duplicates in DB or current import
-            if Contact.objects.filter(email=email).exists() or email in seen_emails:
+            if Contact.objects.filter(primary_email=email).exists() or email in seen_emails:
                 duplicate_emails.append(email)
                 continue
 
             seen_emails.add(email)
+            # Handle many-to-many fields safely
+            assigned_to_raw = row.get('assigned_to', '')
+            teams_raw = row.get('teams', '')
+
+            assigned_to = [
+                pk.strip() for pk in assigned_to_raw.split(',') if pk.strip()
+            ] if assigned_to_raw else [str(request.user.profile.id)]
+
+            # Ensure teams is a list of IDs, even if empty
+            teams = [
+                pk.strip() for pk in teams_raw.split(',') if pk.strip()
+            ] if teams_raw else []
+
             preview_data.append({
-                'first_name': row.get('first_name', ''),
-                'last_name': row.get('last_name', ''),
-                'email': email,
-                'phone': row.get('phone', ''),
-            })
+            'first_name': row.get('first_name', '').strip(),
+            'last_name': row.get('last_name', '').strip(),
+            'primary_email': email.strip(),  
+            'mobile_number': row.get('mobile_number', '').strip(), 
+            'assigned_to': assigned_to,
+            'teams': teams,
+        })
+
 
         # Store in cache for confirmation
         cache.set(f'import_contacts_{import_id}', preview_data, IMPORT_CACHE_TIMEOUT)
@@ -530,3 +548,49 @@ class ContactCSVPreviewView(APIView):
             'total_preview': len(preview_data),
             'duplicates': duplicate_emails
         })
+    
+class ContactCSVConfirmView(APIView):
+    
+    permission_classes = [permissions.IsAuthenticated]
+    @extend_schema(tags=["contacts"], request=ContactCSVConfirmSerializer)
+    def post(self, request):
+        import_id = request.data.get('import_id')
+        
+        if not import_id:
+            return Response({'error': 'Missing import_id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cached_data = cache.get(f'import_contacts_{import_id}')
+        if not cached_data:
+            return Response({'error': 'Preview data expired or not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        imported = 0
+        failed = []
+
+        for row in cached_data:
+            serializer = ContactSerializer(data=row)
+            if serializer.is_valid():
+                contact = serializer.save()
+                profile = Profile.objects.get(user=request.user)
+                contact.org = profile.org
+                contact.save()
+
+                # Validate and add assigned users
+                assigned_profiles = Profile.objects.filter(id__in=row['assigned_to'])
+                contact.assigned_to.set(assigned_profiles)
+
+                # Validate and add teams
+                teams = Teams.objects.filter(id__in=row['teams'])
+                contact.teams.set(teams)
+                imported += 1
+            else:
+                failed.append({'email': row['primary_email'], 'errors': serializer.errors})
+
+        # Remove from cache after import
+        cache.delete(f'import_contacts_{import_id}')
+
+        return Response({
+            'imported': imported,
+            'failed': failed,
+            'failed_count': len(failed),
+        })
+
