@@ -15,6 +15,13 @@ class Role(models.Model):
 
     def __str__(self):
         return self.name
+    
+    def has_permission(self, permission_name: str) -> bool:
+        return self.permissions.filter(name=permission_name).exists()
+
+    @property
+    def permissions(self):
+        return Permission.objects.filter(id__in=RolePermission.objects.filter(role=self).values_list('permission_id', flat=True))
 
 class Permission(models.Model):
     name = models.CharField(max_length=100, unique=True, null=False)
