@@ -517,12 +517,13 @@ class ContactCSVPreviewView(APIView):
 
             seen_emails.add(email)
             # Handle many-to-many fields safely
+            profile = Profile.objects.get(user=request.user)
             assigned_to_raw = row.get('assigned_to', '')
             teams_raw = row.get('teams', '')
 
             assigned_to = [
                 pk.strip() for pk in assigned_to_raw.split(',') if pk.strip()
-            ] if assigned_to_raw else [str(request.user.profile.id)]
+            ] if assigned_to_raw else [str(profile.id)]
 
             # Ensure teams is a list of IDs, even if empty
             teams = [
@@ -530,12 +531,30 @@ class ContactCSVPreviewView(APIView):
             ] if teams_raw else []
 
             preview_data.append({
-            'first_name': row.get('first_name', '').strip(),
-            'last_name': row.get('last_name', '').strip(),
-            'primary_email': email.strip(),  
-            'mobile_number': row.get('mobile_number', '').strip(), 
-            'assigned_to': assigned_to,
-            'teams': teams,
+            "salutation": row.get("salutation", "").strip(),
+            "first_name": row.get("first_name", "").strip(),
+            "last_name": row.get("last_name", "").strip(),
+            "date_of_birth": row.get("date_of_birth", "").strip(),
+            "organization": row.get("organization", "").strip(),
+            "title": row.get("title", "").strip(),
+            "primary_email": row.get("primary_email", "").strip(),
+            "secondary_email": row.get("secondary_email", "").strip(),
+            "mobile_number": row.get("mobile_number", "").strip(),
+            "secondary_number": row.get("secondary_number", "").strip(),
+            "department": row.get("department", "").strip(),
+            "language": row.get("language", "").strip(),
+            "do_not_call": row.get("do_not_call", "False").lower() == "true",
+            "address": row.get("address", None),  # Handle if FK id is provided
+            "description": row.get("description", "").strip(),
+            "linked_in_url": row.get("linked_in_url", "").strip(),
+            "facebook_url": row.get("facebook_url", "").strip(),
+            "twitter_username": row.get("twitter_username", "").strip(),
+            "is_active": row.get("is_active", "False").lower() == "true",
+            "assigned_to": assigned_to,
+            "teams": teams,
+            "org": row.get("org", None),
+            "country": row.get("country", "").strip(),
+        
         })
 
 

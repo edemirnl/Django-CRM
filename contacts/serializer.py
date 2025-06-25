@@ -126,10 +126,10 @@ class ContactImportPreviewSerializer(serializers.Serializer):
     primary_email = serializers.EmailField(required=True)
     mobile_number = serializers.CharField(required=False)
     assigned_to = serializers.ListField(
-        child=serializers.IntegerField(), required=False, allow_empty=True, default=list
+        child=serializers.UUIDField(format='hex_verbose'), required=False, allow_empty=True, default=list
     )
     teams = serializers.ListField(
-        child=serializers.IntegerField(), required=False, allow_empty=True, default=list
+        child=serializers.UUIDField(format='hex_verbose'), required=False, allow_empty=True, default=list
     )
 
 class ContactCSVConfirmSerializer(serializers.Serializer):
