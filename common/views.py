@@ -129,7 +129,8 @@ class UsersListView(APIView, LimitOffsetPagination):
     @extend_schema(parameters=swagger_params1.organization_params,request=UserCreateSwaggerSerializer)
     def post(self, request, format=None):
         print(request.profile.role.name, request.user.is_superuser)
-        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+        #if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+        if not self.request.profile.role.has_permission("Create new user"):
             return Response(
                 {"error": True, "errors": "Permission Denied"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -193,7 +194,8 @@ class UsersListView(APIView, LimitOffsetPagination):
 
     @extend_schema(parameters=swagger_params1.user_list_params)
     def get(self, request, format=None):
-        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+        # if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+        if not self.request.profile.role.has_permission("View all users"):
             return Response(
                 {"error": True, "errors": "Permission Denied"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -264,11 +266,15 @@ class UserDetailView(APIView):
     @extend_schema(tags=["users"], parameters=swagger_params1.organization_params)
     def get(self, request, pk, format=None):
         profile_obj = self.get_object(pk)
+        # if (
+        #     self.request.profile.role.name != "ADMIN"
+        #     and not self.request.profile.is_admin
+        #     and self.request.profile.id != profile_obj.id
+        # ):
         if (
-            self.request.profile.role.name != "ADMIN"
-            and not self.request.profile.is_admin
-            and self.request.profile.id != profile_obj.id
-        ):
+        not self.request.profile.role.has_permission("View user")
+        and self.request.profile.id != profile_obj.id
+        ): 
             return Response(
                 {"error": True, "errors": "Permission Denied"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -305,11 +311,15 @@ class UserDetailView(APIView):
         params = request.data
         profile = self.get_object(pk)
         address_obj = profile.address
+        # if (
+        #     self.request.profile.role.name != "ADMIN"
+        #     and not self.request.user.is_superuser
+        #     and self.request.profile.id != profile.id
+        # ):
         if (
-            self.request.profile.role.name != "ADMIN"
-            and not self.request.user.is_superuser
+            not self.request.profile.role.has_permission("Edit user")
             and self.request.profile.id != profile.id
-        ):
+        ):    
             return Response(
                 {"error": True, "errors": "Permission Denied"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -362,7 +372,8 @@ class UserDetailView(APIView):
         tags=["users"],parameters=swagger_params1.organization_params
     )
     def delete(self, request, pk, format=None):
-        if self.request.profile.role.name != "ADMIN" and not self.request.profile.is_admin:
+        #if self.request.profile.role.name != "ADMIN" and not self.request.profile.is_admin:
+        if not self.request.profile.role.has_permission("Delete user"):
             return Response(
                 {"error": True, "errors": "Permission Denied"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -979,6 +990,8 @@ class GoogleLoginView(APIView):
 from .serializer import CustomLoginSerializer
 
 class CustomLoginView(APIView):
+    permission_classes = (IsAuthenticated,)
+    
     @extend_schema(
         description="Login with email and password and receive user details if it exists.",
         parameters=[
@@ -988,13 +1001,6 @@ class CustomLoginView(APIView):
                 location=OpenApiParameter.QUERY,
                 required=True,
                 description="User email address"
-            ),
-            OpenApiParameter(
-                name="password",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                required=True,
-                description="User password"
             ),
         ],
         responses={
@@ -1007,14 +1013,24 @@ class CustomLoginView(APIView):
        
         serializer = CustomLoginSerializer(data=request.query_params)
         if serializer.is_valid():
-            user_obj = serializer.validated_data['user']
+            #user_obj = serializer.validated_data['user']
+            try:
+                userProfile = Profile.objects.get(user__email=request.query_params.get("email"))
+            except User.DoesNotExist:
+                raise serializers.ValidationError("Incorrect email or password.")
+
+            
+            
             return Response({
-                "username": user_obj.username,
-                "email": user_obj.email,
-                "profile_pic": user_obj.profile_pic,
-                "user_id": user_obj.id
+                "username": userProfile.user.username,
+                "email": userProfile.user.email,
+                "profile_pic": userProfile.user.profile_pic,
+                "user_id": userProfile.user.id,
+                "role": RoleWithPermissionsSerializer(userProfile.role).data
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
 class GoogleAuthConfigView(APIView):
     def get(self, request):
         config, _ = GoogleAuthConfig.objects.get_or_create(id=1)
