@@ -16,6 +16,7 @@ from common.tasks import send_email_to_reset_password
 from django.utils import timezone
 from common.token_generator import account_activation_token
 from role_permission_control.models import Role
+from role_permission_control.serializer import RoleWithPermissionsSerializer
 from common.models import (
     Address,
     APISettings,
@@ -234,8 +235,7 @@ class RoleSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     address = BillingAddressSerializer( read_only=True)
     user_details = UserSerializer(source="user", read_only=True)
-    role_details = RoleSerializer(source="role", read_only=True)
-
+    role_details = RoleWithPermissionsSerializer(source="role", read_only=True)
     class Meta:
         model = Profile
         fields = (
@@ -443,29 +443,15 @@ class UserUpdateStatusSwaggerSerializer(serializers.Serializer):
 # serializer for Customized_login
 class CustomLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, attrs):
         email = attrs.get("email")
-        password = attrs.get("password")
-        User = get_user_model()
 
-        if not email or not password:
-            raise serializers.ValidationError("Email and password is required.")
+        if not email:
+            raise serializers.ValidationError("Email is required.")
 
-        try:
-           user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("Incorrect email or password.")
-
-        if not check_password(password, user.password):
-            raise serializers.ValidationError("Incorrect email or password.")
-
-        if not user.is_active:
-            raise serializers.ValidationError("User is not active.")
-
-        attrs['user'] = user
         return attrs
+
 class GoogleAuthConfigSerializer(serializers.Serializer):
     google_enabled = serializers.BooleanField()
         

@@ -69,9 +69,8 @@ class GetProfileAndOrg(object):
                         profile = Profile.objects.get(
                             user_id=user_id, org=request.headers.get("org"), is_active=True
                         )
-                    else:
-                        profile = Profile.objects.get(user_id=user_id, is_active=True)
-                    request.profile = profile
+                        if profile:
+                            request.profile = profile
                 except Profile.DoesNotExist:
                     raise PermissionDenied("Profile not found or inactive.")
         except Exception as e:

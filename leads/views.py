@@ -747,7 +747,20 @@ class CompaniesView(APIView):
     @extend_schema(tags=["Company"],parameters=swagger_params1.organization_params)
     def get(self, request, *args, **kwargs):
         try:
-            companies=Company.objects.filter(org=request.profile.org)
+            queryset = Company.objects.filter(org=request.profile.org)
+
+            if self.request.profile.role.has_permission("View own companies"):
+                queryset = queryset.filter(created_by=self.request.profile.user)
+            elif not self.request.profile.role.has_permission("View all companies"):
+                return Response(
+                            {
+                                "error": True,
+                                "errors": "You do not have Permission to perform this action",
+                            },
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
+            companies = queryset
             serializer=CompanySerializer(companies,many=True)
             return Response(
                     {"error": False, "data": serializer.data},
@@ -764,6 +777,13 @@ class CompaniesView(APIView):
         tags=["Company"],description="Company Create",parameters=swagger_params1.organization_params,request=CompanySwaggerSerializer
     )
     def post(self, request, *args, **kwargs):
+
+        if not self.request.profile.role.has_permission("Create new companies"): 
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         request.data['org'] = request.profile.org.id
         print(request.data)
         company=CompanySerializer(data=request.data)
@@ -800,6 +820,19 @@ class CompanyDetail(APIView):
     @extend_schema(tags=["Company"],parameters=swagger_params1.organization_params)
     def get(self, request, pk, format=None):
         company = self.get_object(pk)
+
+        if self.request.profile.role.has_permission("View own companies"):
+            if company.created_by != self.request.profile.user:
+                return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        elif not self.request.profile.role.has_permission("View all companies"):
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = CompanySerializer(company)
         return Response(
                 {"error": False, "data": serializer.data},
@@ -808,6 +841,19 @@ class CompanyDetail(APIView):
     @extend_schema(tags=["Company"],description="Company Update",parameters=swagger_params1.organization_params,request=CompanySerializer)
     def put(self, request, pk, format=None):
         company = self.get_object(pk)
+
+        if self.request.profile.role.has_permission("Edit own companies"):
+            if company.created_by != self.request.profile.user:
+                return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        elif not self.request.profile.role.has_permission("Edit any company"):
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         serializer = CompanySerializer(company, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -822,6 +868,19 @@ class CompanyDetail(APIView):
     @extend_schema(tags=["Company"],parameters=swagger_params1.organization_params)
     def delete(self, request, pk, format=None):
         company = self.get_object(pk)
+
+        if self.request.profile.role.has_permission("Delete own companies"):
+            if company.created_by != self.request.profile.user:
+                return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        elif not self.request.profile.role.has_permission("Delete any company"):
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         company.delete()
         return Response(
                 {"error": False, 'message': 'Deleted successfully'},

@@ -7,6 +7,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
 
 from accounts.models import Account, Tags
 from accounts.serializer import AccountSerializer, TagsSerailizer
@@ -39,7 +40,8 @@ class OpportunityListView(APIView, LimitOffsetPagination):
         queryset = self.model.objects.filter(org=self.request.profile.org).order_by("-id")
         accounts = Account.objects.filter(org=self.request.profile.org)
         contacts = Contact.objects.filter(org=self.request.profile.org)
-        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+
+        if self.request.profile.role.has_permission("View own opportunities"):
             queryset = queryset.filter(
                 Q(created_by=self.request.profile.user) | Q(assigned_to=self.request.profile)
             ).distinct()
@@ -49,6 +51,8 @@ class OpportunityListView(APIView, LimitOffsetPagination):
             contacts = contacts.filter(
                 Q(created_by=self.request.profile.user) | Q(assigned_to=self.request.profile)
             ).distinct()
+        elif not self.request.profile.role.has_permission("View all opportunities"):
+             raise PermissionDenied("You do not have Permission to perform this action")
 
         if params:
             if params.get("name"):
@@ -109,6 +113,13 @@ class OpportunityListView(APIView, LimitOffsetPagination):
         parameters=swagger_params1.organization_params,request=OpportunityCreateSwaggerSerializer
     )
     def post(self, request, *args, **kwargs):
+
+        if not self.request.profile.role.has_permission("Create new opportunities"): 
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         params = request.data
         serializer = OpportunityCreateSerializer(data=params, request_obj=request)
         if serializer.is_valid():
@@ -164,10 +175,10 @@ class OpportunityListView(APIView, LimitOffsetPagination):
                 opportunity_obj.assigned_to.all().values_list("id", flat=True)
             )
 
-            send_email_to_assigned_user.delay(
-                recipients,
-                opportunity_obj.id,
-            )
+            # send_email_to_assigned_user.delay(
+            #     recipients,
+            #     opportunity_obj.id,
+            # )
             return Response(
                 {"error": False, "message": "Opportunity Created Successfully"},
                 status=status.HTTP_200_OK,
@@ -199,9 +210,10 @@ class OpportunityDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+        
+        if self.request.profile.role.has_permission("Edit own opportunities"):
             if not (
-                (self.request.profile == opportunity_object.created_by)
+                (self.request.profile.user == opportunity_object.created_by)
                 or (self.request.profile in opportunity_object.assigned_to.all())
             ):
                 return Response(
@@ -211,6 +223,14 @@ class OpportunityDetailView(APIView):
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
+        elif not self.request.profile.role.has_permission("Edit any opportunity"):  
+            return Response(
+                    {
+                        "error": True,
+                        "errors": "You do not have Permission to perform this action",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                ) 
 
         serializer = OpportunityCreateSerializer(
             opportunity_object,
@@ -274,10 +294,10 @@ class OpportunityDetailView(APIView):
                 opportunity_object.assigned_to.all().values_list("id", flat=True)
             )
             recipients = list(set(assigned_to_list) - set(previous_assigned_to_users))
-            send_email_to_assigned_user.delay(
-                recipients,
-                opportunity_object.id,
-            )
+            # send_email_to_assigned_user.delay(
+            #     recipients,
+            #     opportunity_object.id,
+            # )
             return Response(
                 {"error": False, "message": "Opportunity Updated Successfully"},
                 status=status.HTTP_200_OK,
@@ -297,8 +317,9 @@ class OpportunityDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
-            if self.request.profile != self.object.created_by:
+        
+        if self.request.profile.role.has_permission("Delete own opportunities"):
+            if self.request.profile.user != self.object.created_by:
                 return Response(
                     {
                         "error": True,
@@ -306,6 +327,15 @@ class OpportunityDetailView(APIView):
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
+        elif not self.request.profile.role.has_permission("Delete any opportunity"):  
+            return Response(
+                    {
+                        "error": True,
+                        "errors": "You do not have Permission to perform this action",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                ) 
+        
         self.object.delete()
         return Response(
             {"error": False, "message": "Opportunity Deleted Successfully."},
@@ -324,9 +354,10 @@ class OpportunityDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
+        
+        if self.request.profile.role.has_permission("View own opportunities"):
             if not (
-                (self.request.profile == self.opportunity.created_by)
+                (self.request.profile.user == self.opportunity.created_by)
                 or (self.request.profile in self.opportunity.assigned_to.all())
             ):
                 return Response(
@@ -336,11 +367,19 @@ class OpportunityDetailView(APIView):
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
+        elif not self.request.profile.role.has_permission("View all opportunities"):
+            return Response(
+                    {
+                        "error": True,
+                        "errors": "You don't have Permission to perform this action",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )    
 
         comment_permission = False
 
         if (
-            self.request.profile == self.opportunity.created_by
+            self.request.profile.user == self.opportunity.created_by
             or self.request.user.is_superuser
             or self.request.profile.role.name == "ADMIN"
         ):
@@ -352,7 +391,7 @@ class OpportunityDetailView(APIView):
                     "user__email"
                 )
             )
-        elif self.request.profile != self.opportunity.created_by:
+        elif self.request.profile.user != self.opportunity.created_by:
             if self.opportunity.created_by:
                 users_mention = [
                     {"username": self.opportunity.created_by.user.email}

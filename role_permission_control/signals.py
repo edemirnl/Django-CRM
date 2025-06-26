@@ -53,6 +53,7 @@ def seed_rbac_data(sender, app_config, verbosity, interactive, **kwargs):
             ('View all users', 'Allows viewing all users.'),
             ('Create new user', 'Allows creating new user.'),
             ('Edit user', 'Allows editing existing user.'),
+            ('View user', 'Allows viewing existing user.'),
             ('Delete user', 'Allows deleting user.'),
 
             #Role and permissions Management
@@ -138,7 +139,7 @@ def seed_rbac_data(sender, app_config, verbosity, interactive, **kwargs):
 
         # Admin Role: All permissions
         admin_perms = [
-            'View all users', 'Create new user', 'Edit user','Delete user',
+            'View all users', 'Create new user', 'Edit user', 'View user','Delete user',
             'View roles and their permissions','Create new role', 'Edit role','Delete role',
             'View all permissions', 'Create new permission', 'Edit permission', 'Delete permission',
             'View all contacts', 'Create new contacts', 'Edit any contact', 'Delete any contact',
