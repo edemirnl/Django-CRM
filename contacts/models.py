@@ -41,7 +41,7 @@ class Contact(BaseModel):
     # )
     is_active = models.BooleanField(default=False)
     assigned_to = models.ManyToManyField(Profile, related_name="contact_assigned_users")
-    teams = models.ManyToManyField(Teams, related_name="contact_teams")
+    teams = models.ManyToManyField(Teams, related_name="contact_teams", blank=True)
     org = models.ForeignKey(Org, on_delete=models.SET_NULL, null=True, blank=True)
     country = models.CharField(max_length=3, choices=COUNTRIES, blank=True, null=True)
 
