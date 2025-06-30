@@ -118,10 +118,6 @@ class ShowOrganizationListSerializer(serializers.ModelSerializer):
 
 
 class BillingAddressSerializer(serializers.ModelSerializer):
-    #country_display  = serializers.SerializerMethodField(read_only=True)
-
-    #def get_country(self, obj):
-    #    return obj.get_country_display()
 
     class Meta:
         model = Address
@@ -219,10 +215,20 @@ class CreateProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    profile_pic = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ["id","username","email","profile_pic"] 
+
+
+    def get_profile_pic(self, obj):
+        request = self.context.get("request")
+        if obj.profile_pic:
+            if request:
+                return request.build_absolute_uri(obj.profile_pic)
+            return obj.profile_pic  # fallback if no request
+        return None
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -423,6 +429,8 @@ class UserCreateSwaggerSerializer(serializers.Serializer):
     state = serializers.CharField(max_length=1000)
     postcode = serializers.CharField(max_length=1000)
     country = serializers.ChoiceField(choices=COUNTRIES)
+    profile_pic = serializers.ImageField(required=False, allow_null=True)
+
 
 class AdminCreateSwaggerSerializer(serializers.Serializer):
     """
