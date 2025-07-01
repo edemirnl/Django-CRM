@@ -1,6 +1,7 @@
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
@@ -11,7 +12,6 @@ from rest_framework.exceptions import PermissionDenied
 from accounts.models import Account, Tags
 from common.models import APISettings, Attachments, Comment, Profile
 
-#from common.external_auth import CustomDualAuthentication
 from common.serializer import (
     AttachmentsSerializer,
     CommentSerializer,
@@ -23,8 +23,6 @@ from .models import Company,Lead
 from common.utils import COUNTRIES, INDCHOICES, LEAD_SOURCE, LEAD_STATUS
 from contacts.models import Contact
 from leads import swagger_params1
-from leads.forms import LeadListForm
-from leads.models import Company, Lead
 from leads.serializer import (
     CompanySerializer,
     CompanySwaggerSerializer,
