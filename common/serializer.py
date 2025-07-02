@@ -15,8 +15,8 @@ from common.utils import COUNTRIES
 from common.tasks import send_email_to_reset_password
 from django.utils import timezone
 from common.token_generator import account_activation_token
-
-
+from role_permission_control.models import Role
+from role_permission_control.serializer import RoleWithPermissionsSerializer
 from common.models import (
     Address,
     APISettings,
@@ -118,14 +118,10 @@ class ShowOrganizationListSerializer(serializers.ModelSerializer):
 
 
 class BillingAddressSerializer(serializers.ModelSerializer):
-    country_display  = serializers.SerializerMethodField(read_only=True)
-
-    def get_country(self, obj):
-        return obj.get_country_display()
 
     class Meta:
         model = Address
-        fields = ("address_line", "street", "city", "state", "postcode", "country", "country_display")
+        fields = ("address_line", "street", "city", "state", "postcode", "country")
 
     def __init__(self, *args, **kwargs):
         account_view = kwargs.pop("account", False)
@@ -157,7 +153,13 @@ class CreateUserSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         self.fields["email"].required = True
         self.fields["username"].required = True
-        self.fields["password"].required = True
+        #self.fields["password"].required = True
+        # Only require password if it's a create operation
+        if self.instance is None:
+            self.fields["password"].required = True
+        else:
+            self.fields["password"].required = False
+            self.fields["password"].allow_blank = True
 
     # def validate_email(self, email):
     #     if self.instance:
@@ -189,6 +191,11 @@ class CreateUserSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError(", ".join(str(item) for item in errors))
 
 class CreateProfileSerializer(serializers.ModelSerializer):
+    role = serializers.SlugRelatedField(
+        slug_field='name',  
+        queryset=Role.objects.all()
+    )
+
     class Meta:
         model = Profile
         fields = (
@@ -208,26 +215,44 @@ class CreateProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    profile_pic = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ["id","username","email","profile_pic"] 
 
 
-class ProfileSerializer(serializers.ModelSerializer):
-    # address = BillingAddressSerializer()
-    user_details = UserSerializer(source="user", read_only=True)
+    def get_profile_pic(self, obj):
+        request = self.context.get("request")
+        if obj.profile_pic:
+            if request:
+                return request.build_absolute_uri(obj.profile_pic)
+            return obj.profile_pic  # fallback if no request
+        return None
 
+
+class RoleSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Role
+        fields = ["id","name","description"] 
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    address = BillingAddressSerializer( read_only=True)
+    user_details = UserSerializer(source="user", read_only=True)
+    role_details = RoleWithPermissionsSerializer(source="role", read_only=True)
     class Meta:
         model = Profile
         fields = (
             "id",
             "user_details",
-            "role",
+            "role_details",
             "address",
             "has_marketing_access",
             "has_sales_access",
             "phone",
+            "alternate_phone",
             "date_of_joining",
             "is_active",
         )
@@ -389,12 +414,13 @@ class UserCreateSwaggerSerializer(serializers.Serializer):
     """
     It is swagger for creating or updating user
     """
-    ROLE_CHOICES = ["ADMIN", "USER"]
+    #ROLE_CHOICES = ["ADMIN", "USER"]
 
     username = serializers.CharField(max_length=1000,required=True)
     email = serializers.CharField(max_length=1000,required=True)
     password = serializers.CharField(max_length=1000)
-    role = serializers.ChoiceField(choices = ROLE_CHOICES,required=True)
+    #role = serializers.ChoiceField(choices = ROLE_CHOICES,required=True)
+    role = serializers.CharField(max_length=1000,required=True)
     phone = serializers.CharField(max_length=12)
     alternate_phone = serializers.CharField(max_length=12)
     address_line = serializers.CharField(max_length=10000,required=True)
@@ -403,6 +429,8 @@ class UserCreateSwaggerSerializer(serializers.Serializer):
     state = serializers.CharField(max_length=1000)
     postcode = serializers.CharField(max_length=1000)
     country = serializers.ChoiceField(choices=COUNTRIES)
+    profile_pic = serializers.ImageField(required=False, allow_null=True)
+
 
 class AdminCreateSwaggerSerializer(serializers.Serializer):
     """
@@ -423,29 +451,15 @@ class UserUpdateStatusSwaggerSerializer(serializers.Serializer):
 # serializer for Customized_login
 class CustomLoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, attrs):
         email = attrs.get("email")
-        password = attrs.get("password")
-        User = get_user_model()
 
-        if not email or not password:
-            raise serializers.ValidationError("Email and password is required.")
+        if not email:
+            raise serializers.ValidationError("Email is required.")
 
-        try:
-           user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("Incorrect email or password.")
-
-        if not check_password(password, user.password):
-            raise serializers.ValidationError("Incorrect email or password.")
-
-        if not user.is_active:
-            raise serializers.ValidationError("User is not active.")
-
-        attrs['user'] = user
         return attrs
+
 class GoogleAuthConfigSerializer(serializers.Serializer):
     google_enabled = serializers.BooleanField()
         

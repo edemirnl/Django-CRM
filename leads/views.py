@@ -1,16 +1,17 @@
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied
 
 from accounts.models import Account, Tags
 from common.models import APISettings, Attachments, Comment, Profile
 
-#from common.external_auth import CustomDualAuthentication
 from common.serializer import (
     AttachmentsSerializer,
     CommentSerializer,
@@ -22,8 +23,6 @@ from .models import Company,Lead
 from common.utils import COUNTRIES, INDCHOICES, LEAD_SOURCE, LEAD_STATUS
 from contacts.models import Contact
 from leads import swagger_params1
-from leads.forms import LeadListForm
-from leads.models import Company, Lead
 from leads.serializer import (
     CompanySerializer,
     CompanySwaggerSerializer,
@@ -61,11 +60,14 @@ class LeadListView(APIView, LimitOffsetPagination):
                 "assigned_to",
             )
         ).order_by("-id")
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
+
+        if self.request.profile.role.has_permission("View own leads"):
             queryset = queryset.filter(
                 Q(assigned_to__in=[self.request.profile])
                 | Q(created_by=self.request.profile.user)
             )
+        elif not self.request.profile.role.has_permission("View all leads"):
+            raise PermissionDenied("You do not have permission to perform this action.")
 
         if params:
             if params.get("name"):
@@ -157,6 +159,12 @@ class LeadListView(APIView, LimitOffsetPagination):
     )
     def post(self, request, *args, **kwargs):
 
+        if not self.request.profile.role.has_permission("Create new leads"): 
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         print('test')
         data = request.data
         serializer = LeadCreateSerializer(data=data, request_obj=request)
@@ -180,10 +188,10 @@ class LeadListView(APIView, LimitOffsetPagination):
                 lead_obj.contacts.add(*obj_contact)
 
             recipients = list(lead_obj.assigned_to.all().values_list("id", flat=True))
-            send_email_to_assigned_user.delay(
-                recipients,
-                lead_obj.id,
-            )
+            # send_email_to_assigned_user.delay(
+            #     recipients,
+            #     lead_obj.id,
+            # )
 
             if request.FILES.get("lead_attachment"):
                 attachment = Attachments()
@@ -245,11 +253,12 @@ class LeadListView(APIView, LimitOffsetPagination):
                         "error": False,
                         "message": "Lead Converted to Account Successfully",
                     },
-                    status=status.HTTP_200_OK,
+                    status=status.HTTP_201_CREATED,
+
                 )
             return Response(
-                {"error": False, "message": "Lead Created Successfully"},
-                status=status.HTTP_200_OK,
+                {"error": False, "message": "Lead Created Successfully", "data": LeadSerializer(lead_obj).data},
+                status=status.HTTP_201_CREATED,
             )
         return Response(
             {"error": True, "errors": serializer.errors},
@@ -273,15 +282,12 @@ class LeadDetailView(APIView):
         ]
         if self.request.profile.user == self.lead_obj.created_by:
             user_assgn_list.append(self.request.profile.user)
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
+
+        if self.request.profile.role.has_permission("View own leads"):
             if self.request.profile.id not in user_assgn_list:
-                return Response(
-                    {
-                        "error": True,
-                        "errors": "You do not have Permission to perform this action",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+                raise PermissionDenied("You do not have permission to perform this action.")
+        elif not self.request.profile.role.has_permission("View all leads"):
+            raise PermissionDenied("You do not have permission to perform this action.")
 
         comments = Comment.objects.filter(lead=self.lead_obj).order_by("-id")
         attachments = Attachments.objects.filter(lead=self.lead_obj).order_by("-id")
@@ -292,7 +298,7 @@ class LeadDetailView(APIView):
             assigned_dict["name"] = each.user.email
             assigned_data.append(assigned_dict)
 
-        if self.request.user.is_superuser or self.request.profile.role == "ADMIN":
+        if self.request.user.is_superuser or self.request.profile.role.name == "ADMIN":
             users_mention = list(
                 Profile.objects.filter(is_active=True, org=self.request.profile.org).values(
                     "user__email"
@@ -304,12 +310,12 @@ class LeadDetailView(APIView):
             users_mention = list(
                 self.lead_obj.assigned_to.all().values("user__email")
             )
-        if self.request.profile.role == "ADMIN" or self.request.user.is_superuser:
+        if self.request.profile.role.name == "ADMIN" or self.request.user.is_superuser:
             users = Profile.objects.filter(
                 is_active=True, org=self.request.profile.org
             ).order_by("user__email")
         else:
-            users = Profile.objects.filter(role="ADMIN", org=self.request.profile.org).order_by(
+            users = Profile.objects.filter(role__name="ADMIN", org=self.request.profile.org).order_by(
                 "user__email"
             )
         user_assgn_list = [
@@ -319,7 +325,7 @@ class LeadDetailView(APIView):
 
         if self.request.profile.user == self.lead_obj.created_by:
             user_assgn_list.append(self.request.profile.id)
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
+        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
             if self.request.profile.id not in user_assgn_list:
                 return Response(
                     {
@@ -371,7 +377,7 @@ class LeadDetailView(APIView):
                 {"error": True, "errors": "User company doesnot match with header...."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        if self.request.profile.role != "ADMIN" and not self.request.user.is_superuser:
+        if self.request.profile.role.name != "ADMIN" and not self.request.user.is_superuser:
             if not (
                 (self.request.profile.user == self.lead_obj.created_by)
                 or (self.request.profile in self.lead_obj.assigned_to.all())
@@ -431,6 +437,28 @@ class LeadDetailView(APIView):
             request_obj=request,
         )
         if serializer.is_valid():
+
+            if self.request.profile.role.has_permission("Edit own leads"):
+                if not (
+                    (self.request.profile.user == self.lead_obj.created_by)
+                    or (self.request.profile in self.lead_obj.assigned_to.all())
+                ):
+                    return Response(
+                        {
+                            "error": True,
+                            "errors": "You do not have Permission to perform this action",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            elif not self.request.profile.role.has_permission("Edit any lead"):
+                return Response(
+                        {
+                            "error": True,
+                            "errors": "You do not have Permission to perform this action",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+        
             lead_obj = serializer.save()
             previous_assigned_to_users = list(
                 lead_obj.assigned_to.all().values_list("id", flat=True)
@@ -438,9 +466,7 @@ class LeadDetailView(APIView):
             lead_obj.tags.clear()
             if params.get("tags"):
                 tags = params.get("tags")
-                # for t in tags:
-                #     tag,_ = Tags.objects.get_or_create(name=t)
-                #     lead_obj.tags.add(tag)
+                
                 for t in tags:
                     tag = Tags.objects.filter(slug=t.lower())
                     if tag.exists():
@@ -453,10 +479,10 @@ class LeadDetailView(APIView):
                 lead_obj.assigned_to.all().values_list("id", flat=True)
             )
             recipients = list(set(assigned_to_list) - set(previous_assigned_to_users))
-            send_email_to_assigned_user.delay(
-                recipients,
-                lead_obj.id,
-            )
+            # send_email_to_assigned_user.delay(
+            #     recipients,
+            #     lead_obj.id,
+            # )
             if request.FILES.get("lead_attachment"):
                 attachment = Attachments()
                 attachment.created_by = request.profile.user
@@ -546,10 +572,8 @@ class LeadDetailView(APIView):
     def delete(self, request, pk, **kwargs):
         self.object = self.get_object(pk)
         if (
-            request.profile.role == "ADMIN"
-            or request.user.is_superuser
-            or request.profile.user
-             == self.object.created_by
+            request.profile.role.has_permission("Delete any lead")
+            or (request.profile.user == self.object.created_by and request.profile.role.has_permission("Delete own leads"))
         ) and self.object.org == request.profile.org:
             self.object.delete()
             return Response(
@@ -601,7 +625,7 @@ class LeadCommentView(APIView):
         params = request.data
         obj = self.get_object(pk)
         if (
-            request.profile.role == "ADMIN"
+            request.profile.role.name == "ADMIN"
             or request.user.is_superuser
             or request.profile == obj.commented_by
         ):
@@ -628,7 +652,7 @@ class LeadCommentView(APIView):
     def delete(self, request, pk, format=None):
         self.object = self.get_object(pk)
         if (
-            request.profile.role == "ADMIN"
+            request.profile.role.name == "ADMIN"
             or request.user.is_superuser
             or request.profile == self.object.commented_by
         ):
@@ -656,7 +680,7 @@ class LeadAttachmentView(APIView):
     def delete(self, request, pk, format=None):
         self.object = self.model.objects.get(pk=pk)
         if (
-            request.profile.role == "ADMIN"
+            request.profile.role.name == "ADMIN"
             or request.user.is_superuser
             or request.profile.user == self.object.created_by
         ):
@@ -748,7 +772,20 @@ class CompaniesView(APIView):
     @extend_schema(tags=["Company"],parameters=swagger_params1.organization_params)
     def get(self, request, *args, **kwargs):
         try:
-            companies=Company.objects.filter(org=request.profile.org)
+            queryset = Company.objects.filter(org=request.profile.org)
+
+            if self.request.profile.role.has_permission("View own companies"):
+                queryset = queryset.filter(created_by=self.request.profile.user)
+            elif not self.request.profile.role.has_permission("View all companies"):
+                return Response(
+                            {
+                                "error": True,
+                                "errors": "You do not have Permission to perform this action",
+                            },
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
+            companies = queryset
             serializer=CompanySerializer(companies,many=True)
             return Response(
                     {"error": False, "data": serializer.data},
@@ -765,6 +802,13 @@ class CompaniesView(APIView):
         tags=["Company"],description="Company Create",parameters=swagger_params1.organization_params,request=CompanySwaggerSerializer
     )
     def post(self, request, *args, **kwargs):
+
+        if not self.request.profile.role.has_permission("Create new companies"): 
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         request.data['org'] = request.profile.org.id
         print(request.data)
         company=CompanySerializer(data=request.data)
@@ -801,6 +845,19 @@ class CompanyDetail(APIView):
     @extend_schema(tags=["Company"],parameters=swagger_params1.organization_params)
     def get(self, request, pk, format=None):
         company = self.get_object(pk)
+
+        if self.request.profile.role.has_permission("View own companies"):
+            if company.created_by != self.request.profile.user:
+                return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        elif not self.request.profile.role.has_permission("View all companies"):
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = CompanySerializer(company)
         return Response(
                 {"error": False, "data": serializer.data},
@@ -809,6 +866,19 @@ class CompanyDetail(APIView):
     @extend_schema(tags=["Company"],description="Company Update",parameters=swagger_params1.organization_params,request=CompanySerializer)
     def put(self, request, pk, format=None):
         company = self.get_object(pk)
+
+        if self.request.profile.role.has_permission("Edit own companies"):
+            if company.created_by != self.request.profile.user:
+                return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        elif not self.request.profile.role.has_permission("Edit any company"):
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         serializer = CompanySerializer(company, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -823,6 +893,19 @@ class CompanyDetail(APIView):
     @extend_schema(tags=["Company"],parameters=swagger_params1.organization_params)
     def delete(self, request, pk, format=None):
         company = self.get_object(pk)
+
+        if self.request.profile.role.has_permission("Delete own companies"):
+            if company.created_by != self.request.profile.user:
+                return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        elif not self.request.profile.role.has_permission("Delete any company"):
+            return Response(
+                {"error": True, "errors": "Permission Denied"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
         company.delete()
         return Response(
                 {"error": False, 'message': 'Deleted successfully'},

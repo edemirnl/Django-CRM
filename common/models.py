@@ -24,6 +24,7 @@ from common.templatetags.common_tags import (
 )
 from common.utils import COUNTRIES, ROLES
 from common.base import BaseModel
+from role_permission_control.models import Role, Permission,RolePermission
 
 
 def img_url(self, filename):
@@ -60,10 +61,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
-    # def save(self, *args, **kwargs):
-    #     """by default the expiration time is set to 2 hours"""
-    #     self.key_expires = timezone.now() + datetime.timedelta(hours=2)
-    #     super().save(*args, **kwargs)
 
 class Address(BaseModel):
     address_line = models.CharField(
@@ -140,54 +137,6 @@ class Org(BaseModel):
         return str(self.name)
 
 
-# class User(AbstractBaseUser, PermissionsMixin):
-#     email = models.EmailField(_("email address"), blank=True, unique=True)
-#     profile_pic = models.FileField(
-#         max_length=1000, upload_to=img_url, null=True, blank=True
-#     )
-#     activation_key = models.CharField(max_length=150, null=True, blank=True)
-#     key_expires = models.DateTimeField(null=True, blank=True)
-
-
-#     USERNAME_FIELD = "email"
-#     REQUIRED_FIELDS = ["username"]
-
-#     objects = UserManager()
-
-#     def get_short_name(self):
-#         return self.username
-
-#     def documents(self):
-#         return self.document_uploaded.all()
-
-#     def get_full_name(self):
-#         full_name = None
-#         if self.first_name or self.last_name:
-#             full_name = self.first_name + " " + self.last_name
-#         elif self.username:
-#             full_name = self.username
-#         else:
-#             full_name = self.email
-#         return full_name
-
-#     @property
-#     def created_on_arrow(self):
-#         return arrow.get(self.date_joined).humanize()
-
-#     class Meta:
-#         ordering = ["-is_active"]
-
-#     def __str__(self):
-#         return self.email
-
-#     def save(self, *args, **kwargs):
-#         """by default the expiration time is set to 2 hours"""
-#         self.key_expires = timezone.now() + datetime.timedelta(hours=2)
-#         super().save(*args, **kwargs)
-
-
-
-
 class Profile(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     org = models.ForeignKey(
@@ -202,7 +151,8 @@ class Profile(BaseModel):
         blank=True,
         null=True,
     )
-    role = models.CharField(max_length=50, choices=ROLES, default="USER")
+    #role = models.CharField(max_length=50, choices=ROLES, default="USER")
+    role = models.ForeignKey(Role,on_delete=models.CASCADE,null=False,blank=True,related_name='user_role')
     has_sales_access = models.BooleanField(default=False)
     has_marketing_access = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -219,6 +169,15 @@ class Profile(BaseModel):
     def __str__(self):
         return f"{self.user.email} <{self.org.name}>"
 
+    def has_permission(self, name):
+        """
+        Custom method to check if the user's assigned role has a specific permission.
+        """
+        if self.role:
+            # Check if the role has the specific permission
+            return self.role.role_permissions.filter(permission__name=name).exists()
+        return False
+    
     @property
     def is_admin(self):
         return self.is_organization_admin
